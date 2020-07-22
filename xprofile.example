@@ -1,2 +1,2 @@
-# Clean cache on startup
+# clean cached values on start-up
 network-traffic -u &
