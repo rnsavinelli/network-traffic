@@ -1,0 +1,2 @@
+# Execute network-traffic -s and network-traffic -u every hour.
+0 * * * * /path/to/network-traffic -s && /path/to/network-traffic -u

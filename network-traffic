@@ -1,0 +1,113 @@
+#!/bin/sh
+#
+# Network traffic monitoring script.
+#
+# Stores and Prints how much data has been received (RX) or transmitted (TX)
+# by reading system statistics.
+# Calculates the delta RX and the delta TX since the previous time the cache
+# was updated to inform the network traffic.
+#
+# If 'network-traffic -u' is run every hour, 'network-traffic -n' will show
+# network traffic per hour.
+#
+# (c) 2020 Savinelli Roberto Nicolás <rsavinelli@est.frba.utn.edu.ar>
+
+######################## network-traffic cofigurations ########################
+interface="wlp3s0"
+
+logfile="${XDG_CACHE_HOME:-$HOME/.cache}/netlog"
+loghistfile="${XDG_CACHE_HOME:-$HOME/.cache}/netloghistory"
+###############################################################################
+
+rxcurrent="$(($(paste -d '+' /sys/class/net/$interface/statistics/rx_bytes)))"
+txcurrent="$(($(paste -d '+' /sys/class/net/$interface/statistics/tx_bytes)))"
+
+# If cache has been updated deltarx and deltatx will be calculated.
+# See _get_traffic on line 44 for more information.
+deltarx="0"
+deltatx="0"
+
+_usage_info() {
+    printf "network-traffic v1.0 Network Traffic Monitoring script.\\nCopyright (c) 2020 R Nicolás Savinelli <rsavinelli@est.frba.utn.edu.ar>\\n\\n"
+    printf \
+        "Usage: network-traffic [OPTION]\
+        \n\
+        \n\t-n: notify network traffic since last cache update.\
+        \n\t-p: print network traffic since last cache update to standard output.\
+        \n\
+        \n\t-h: print all network traffic history.\
+        \n\t-s: store network traffic data to the history file.\
+        \n\t-x: clear network traffic history.\
+        \n\
+        \n\t-u: update network traffic cache.\n"
+}
+
+_get_traffic() {
+    local prevdata="$(cat "$logfile")"
+
+    deltarx="$((($rxcurrent-${prevdata%% *})/1024))"
+    deltatx="$((($txcurrent-${prevdata##* })/1024))"
+}
+
+_cache_verify() {
+    touch $logfile
+
+    if [ "$(du -s $logfile | awk '{print $1}')" -eq "0" ]; then
+        printf \
+            "WARNING: Cache should be updated before performing this operation\
+            \n\t for the first time. To solve this issue, run:\n \
+            \n\t network-traffic -u\n\n" 1>&2
+        _usage_info
+        exit 1
+    fi
+}
+
+_cache_update() {
+    touch $logfile
+    truncate --size=0 $logfile
+
+    echo \
+        "$rxcurrent $txcurrent" > "$logfile"
+}
+
+_history_clear() {
+    touch $loghistfile
+    truncate --size=0 $loghistfile
+}
+
+_history_store(){
+    touch $loghistfile
+
+    echo \
+        "$deltarx $deltatx" >> $loghistfile
+}
+
+_history_print() {
+    touch $loghistfile
+    cat $loghistfile
+}
+
+_traffic_print(){
+    printf \
+        "Interface: $(echo $interface)\n\nReceived: %s kB\nTransmitted: %s kB\n" \
+        "$deltarx" "$deltatx"
+}
+
+_traffic_notify() {
+    notify-send \
+        "Network traffic update" "$(_traffic_print)"
+}
+
+case "$1" in
+    # Current data
+    -n*) _cache_verify && _get_traffic && _traffic_notify;;
+    -p*) _cache_verify && _get_traffic && _traffic_print;;
+    # History
+    -h*) _history_print;;
+    -s*) _cache_verify && _get_traffic && _history_store;;
+    -x*) _history_clear;;
+    # Cache
+    -u*) _cache_update;;
+    # Usage
+    *) _usage_info;;
+esac
