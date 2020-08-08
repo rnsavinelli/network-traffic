@@ -14,6 +14,4 @@ Usage: network-traffic [OPTION]
 
 ## License
 
-All scripts are provided under an MIT License.
-
 MIT License: <https://mit-license.org/> or see the [`LICENSE`](LICENSE) file.
